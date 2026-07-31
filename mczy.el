@@ -77,6 +77,11 @@ as candidate keys."
                  (const :tag "Vertical" vertical))
   :group 'mczy)
 
+(defcustom mczy-hide-cursor-while-composing t
+  "Whether to hide the original cursor during composition."
+  :type 'boolean
+  :group 'mczy)
+
 (defcustom mczy-toggle-candidate-layout-key (kbd "<f8>")
   "Key that toggles the candidate overlay between horizontal and vertical.
 The key is active during composition, including while the candidate box is
@@ -878,10 +883,14 @@ handler ends the session or an unbound key sequence falls through."
         (overriding-terminal-local-map (mczy--composition-keymap))
         (echo-keystrokes 0)
         (help-char nil)
+        (cursor-type-was-local (local-variable-p 'cursor-type))
+        (previous-cursor-type cursor-type)
         last-command-event last-command this-command)
     (mczy--reset-state)
     (mczy--ensure-process)
     (mczy--render)
+    (when mczy-hide-cursor-while-composing
+      (setq-local cursor-type nil))
     (unwind-protect
         (progn
           (mczy--add-unread-command-events first-key)
@@ -903,7 +912,11 @@ handler ends the session or an unbound key sequence falls through."
       (when (memq mczy--state '(inputting choosing marking))
         (ignore-errors (mczy--send-command '(reset))))
       (mczy--reset-state)
-      (mczy--overlay-hide))
+      (mczy--overlay-hide)
+      (when mczy-hide-cursor-while-composing
+        (if cursor-type-was-local
+            (setq-local cursor-type previous-cursor-type)
+          (kill-local-variable 'cursor-type))))
     mczy--result-events))
 
 (defun mczy--input-method (key)
